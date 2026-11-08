@@ -1,0 +1,52 @@
+# SBE1V1K 编译超时看门狗。
+#
+# 存在原因：调用 reusable workflow 的 job 不支持 timeout-minutes
+# （GitHub Actions 已知限制），而编译核心 WRT-CORE.yml 属上游文件不可修改。
+# 无护栏时单次卡死将占用默认上限 6 小时 runner 时长。
+#
+# ⚠️ workflow_run 只能捕获"顶层 workflow 的独立 run"：
+#   - 手动 QWRT-SBE1V1K workflow_dispatch → 产生独立 QWRT-SBE1V1K run → 由 "QWRT-SBE1V1K" 覆盖
+#   - 每周编译固件(Weekly-Build) 通过 workflow_call 内嵌调用 QWRT-SBE1V1K，
+#     不会产生独立 QWRT-SBE1V1K run（jobs 显示在调用方 run 内，如
+#     "构建 SBE1V1K 固件 / QWRT-SBE1V1K / VIKINGYFY/immortalwrt"）→ 必须同时监听 "每周编译固件"
+name: 编译超时看门狗
+
+on:
+  workflow_run:
+    workflows: ["QWRT-SBE1V1K", "每周编译固件"]
+    types: [requested]
+
+permissions:
+  actions: write
+
+concurrency:
+  group: sbe1v1k-guard-${{ github.event.workflow_run.id }}
+  cancel-in-progress: false
+
+jobs:
+  guard:
+    name: 监视编译时长
+    runs-on: ubuntu-latest
+    timeout-minutes: 250
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      RUN_ID: ${{ github.event.workflow_run.id }}
+      # 已校准：根据历史编译耗时，取 1.5 倍安全余量
+      # 当前值：240 分钟，应大于正常编译耗时且小于 6 小时默认上限
+      LIMIT_MINUTES: '240'
+    steps:
+      - name: 轮询并在超时后取消
+        run: |
+          set -euo pipefail
+          deadline=$(( $(date +%s) + LIMIT_MINUTES * 60 ))
+          while [ "$(date +%s)" -lt "$deadline" ]; do
+            status="$(gh run view "$RUN_ID" --json status -q .status)"
+            if [ "$status" = "completed" ]; then
+              echo "编译已正常结束"
+              exit 0
+            fi
+            sleep 120
+          done
+          echo "::error::SBE1V1K 编译超过 ${LIMIT_MINUTES} 分钟，强制取消 run ${RUN_ID}"
+          gh run cancel "$RUN_ID"

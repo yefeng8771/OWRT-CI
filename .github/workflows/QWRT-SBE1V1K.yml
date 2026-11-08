@@ -1,0 +1,96 @@
+# OWRT-CI 专用编译工作流（本仓只编这一台设备）
+#   - 仅编译 Askey SBE1V1K (qualcommbe-ipq95xx-askey_sbe1v1k)
+#   - 基线: VIKINGYFY/OpenWRT-CI 上游 QCB-ALL 对 IPQ95XX 的配对参数
+#     (源码 VIKINGYFY/immortalwrt 的 owrt 分支, 主题 vantage)
+#   - 静态指定品牌参数 (OWRT / 172.16.4.1)
+#   - 设备与追加工具: Config/IPQ95XX-SBE1V1K.txt (仅 askey_sbe1v1k + 6rd/ethtool/ntfs3-mount)
+#   - fork 私有包 (StunDeck/EasyTier/Syncthing/nmap/net-tools/nano-full 等) 与
+#     HomeProxy/Gecoosac 排除 (=n) 均由 Config/PRIVATE.txt + Scripts/PRIVATE.sh 注入,
+#     不修改任何上游文件, 上游每日同步可零冲突合并
+#   - 被 Weekly-Build.yml 通过 workflow_call 每周调用, 也可手动 workflow_dispatch
+#
+# 预检 job: WRT-CORE 的 Custom Settings 会把 Config/IPQ95XX-SBE1V1K.txt +
+# GENERAL.txt + PRIVATE.txt 直接 cat 成 .config, 且 GNU make 会 include 它。
+# 任何一行语法错误都会让编译在数分钟后失败且报错晦涩, 故编译前先用秒级
+# 预检把这类错误拦下。周编译与手动触发两条路径都经过本 job。
+name: QWRT-SBE1V1K
+
+on:
+  workflow_call:
+    inputs:
+      PACKAGE:
+        required: false
+        type: string
+        default: ''
+      TEST:
+        required: false
+        type: boolean
+        default: false
+  workflow_dispatch:
+    inputs:
+      PACKAGE:
+        description: '手动调整插件包，多个请用\n符号隔开。留空=使用 PRIVATE.txt 默认。'
+        required: false
+        default: ''
+      TEST:
+        description: '仅测试配置(不编译固件)'
+        required: false
+        type: boolean
+        default: false
+
+# GITHUB_TOKEN 需 contents:write 才能创建 Release (repo 默认 read-only, 见 WRT-CORE Release 步骤)
+# reusable workflow 的 token 权限由调用方本块的 permissions 决定
+permissions:
+  contents: write
+  actions: write  # WRT-CORE Update Caches 步 gh cache delete 需 actions:write, 否则 HTTP 403
+
+jobs:
+  # 秒级配置预检: 拦截 .config 片段语法错误, 避免烧掉整轮 runner 时间
+  precheck:
+    name: 配置预检
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    env:
+      # ⚠️ 需与下方 build job 的 WRT_CONFIG 保持一致
+      WRT_CONFIG: IPQ95XX-SBE1V1K
+    steps:
+      - name: 拉取代码
+        uses: actions/checkout@v4
+
+      - name: 校验器自检
+        # 先确认校验器能拦截已知坏样例，防止校验器本身失效变"永真"
+        run: |
+          set -euo pipefail
+          printf 'CONFIG_PACKAGE_foo=y\nCONFIG_TARGET_DEVICE_qualcommbe_ipq95xx_DEVICE_askey_sbe1v1k is not set\n' > /tmp/bad.cfg
+          if .github/scripts/check-config.sh /tmp/bad.cfg >/dev/null 2>&1; then
+            echo "::error::校验器未能拦截已知的坏样例，校验器自身有缺陷"
+            exit 1
+          fi
+          echo "校验器自检通过（能拦截坏样例）"
+
+      - name: 校验 .config 片段语法
+        # 与 WRT-CORE.yml Custom Settings 步骤 cat 进 .config 的文件保持一致
+        run: |
+          set -euo pipefail
+          .github/scripts/check-config.sh \
+            "Config/${WRT_CONFIG}.txt" Config/GENERAL.txt Config/PRIVATE.txt
+
+  build:
+    name: 构建 SBE1V1K 固件
+    needs: precheck
+    uses: ./.github/workflows/WRT-CORE.yml
+    with:
+      WRT_CONFIG: IPQ95XX-SBE1V1K
+      WRT_THEME: vantage
+      WRT_NAME: OWRT
+      WRT_SSID: OWRT
+      WRT_WORD: "12345678"
+      WRT_IP: 172.16.4.1
+      WRT_PW: "无"
+      WRT_REPO: https://github.com/VIKINGYFY/immortalwrt.git
+      WRT_BRANCH: owrt
+      WRT_SOURCE: VIKINGYFY/immortalwrt
+      WRT_PACKAGE: ${{ inputs.PACKAGE }}
+      WRT_TEST: ${{ inputs.TEST }}
