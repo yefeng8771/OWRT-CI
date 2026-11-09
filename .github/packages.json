@@ -3,7 +3,7 @@
     "ciRepo": "VIKINGYFY/OpenWRT-CI",
     "ciBranch": "main",
     "sourceRepo": "VIKINGYFY/immortalwrt",
-    "sourceBranch": "main",
+    "sourceBranch": "owrt",
     "currentCiCommit": "c4cd7d0c44cdaa21c73fc2ea59532c0ec6069a28",
     "currentSourceCommit": "f9b0ce7650fdcc7f4793256a3ae43c1132e2bc49"
   },
