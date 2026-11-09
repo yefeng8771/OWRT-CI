@@ -80,7 +80,7 @@ jobs:
   build:
     name: 构建 SBE1V1K 固件
     needs: precheck
-    uses: ./.github/workflows/WRT-CORE.yml
+    uses: ./.github/workflows/WRT-CORE-SBE1V1K-ARTIFACT.yml
     with:
       WRT_CONFIG: IPQ95XX-SBE1V1K
       WRT_THEME: vantage
