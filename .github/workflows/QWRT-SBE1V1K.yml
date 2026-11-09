@@ -87,7 +87,7 @@ jobs:
       WRT_NAME: OWRT
       WRT_SSID: OWRT
       WRT_WORD: "12345678"
-      WRT_IP: 172.16.4.1
+      WRT_IP: 192.168.10.1
       WRT_PW: "无"
       WRT_REPO: https://github.com/VIKINGYFY/immortalwrt.git
       WRT_BRANCH: owrt

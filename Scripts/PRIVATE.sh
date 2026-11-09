@@ -50,6 +50,11 @@ test -f "$MANIFEST" || { echo "[qwrt]   ERROR: $MANIFEST not found" >&2; exit 1;
 # 补齐缺失的 libffi；上游已有时不覆盖。
 bash "$GW/Scripts/install-libffi.sh" "$WRT_ROOT"
 
+# SBE1V1K rootfs limit: patch only the temporary source checkout, not upstream repository files.
+if [ "${WRT_CONFIG:-}" = "IPQ95XX-SBE1V1K" ]; then
+    python3 "$GW/Scripts/install-sbe-rootfs-guard.py" "$WRT_ROOT" "$GW/Scripts/sbe-rootfs-guard.sh"
+fi
+
 # ============ [1] StunDeck opkg 包 + release 裸二进制 ============
 echo "[qwrt] [1/6] Injecting stundeck opkg package + pulling release binaries..."
 
