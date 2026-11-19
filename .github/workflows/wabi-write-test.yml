@@ -1,0 +1,18 @@
+name: Wabi sync token write test
+on: workflow_dispatch
+permissions:
+  contents: write
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+      - run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          echo '# write permission test' >> .github/workflows/wabi-write-test.yml
+          git add .github/workflows/wabi-write-test.yml
+          git commit -m 'test: check workflow file write permission'
+          git push origin HEAD:${GITHUB_REF_NAME}
