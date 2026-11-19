@@ -18,7 +18,8 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
+  actions: write
 
 # 同步总是取最新上游，后续运行可覆盖进行中的旧运行
 concurrency:
@@ -39,7 +40,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.AUTOSYNC_PAT }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: 配置 Git 身份
         run: |
@@ -50,7 +51,7 @@ jobs:
       - name: 强制合并上游
         id: merge
         env:
-          GH_TOKEN: ${{ secrets.AUTOSYNC_PAT }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           git remote add upstream "https://github.com/${UPSTREAM_REPO}.git"
@@ -78,7 +79,7 @@ jobs:
         # gh 在含 upstream remote 的工作树内会把仓库解析为 upstream(VIKINGYFY),
         # 必须用 GH_REPO 显式锚定本仓
         env:
-          GH_TOKEN: ${{ secrets.AUTOSYNC_PAT }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
@@ -109,13 +110,16 @@ jobs:
         if: always()
         env:
           CHANGED: ${{ steps.merge.outputs.changed }}
+          MERGE_OUTCOME: ${{ steps.merge.outcome }}
           HEAD_SHA: ${{ steps.merge.outputs.upstream_head }}
         run: |
           set -euo pipefail
           {
             echo "## 上游同步"
             echo
-            if [ "$CHANGED" = "true" ]; then
+            if [ "$MERGE_OUTCOME" != "success" ]; then
+              echo "- 上游同步失败，请查看日志"
+            elif [ "$CHANGED" = "true" ]; then
               echo "- 已同步 \`${UPSTREAM_REPO}\` → \`${HEAD_SHA:0:7}\`"
             else
               echo "- 上游无变更"
