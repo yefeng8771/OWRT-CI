@@ -89,10 +89,12 @@ jobs:
           # Auto-Clean.yml 必须保持禁用：其 releases_keep_latest=0 + delete_tags=true
           # 会每天清空所有 release 与 tag，与周编译节奏严重冲突。
           for wf in Auto-Clean.yml AIROHA-ALL.yml MTK-ALL.yml OWRT-ALL.yml QCA-ALL.yml QCB-ALL.yml WRT-TEST.yml Cache-Clean.yml; do
-            state="$(gh workflow view "$wf" --json state -q .state 2>/dev/null || echo missing)"
+            if ! state="$(gh api "repos/${GH_REPO}/actions/workflows/${wf}" --jq .state)"; then
+              echo "::error::无法读取 workflow 状态：$wf"
+              failed=1
+              continue
+            fi
             case "$state" in
-              missing)
-                echo "不存在，跳过：$wf" ;;
               disabled_manually|disabled_inactivity)
                 echo "已禁用：$wf" ;;
               *)
