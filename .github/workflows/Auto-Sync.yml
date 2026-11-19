@@ -51,8 +51,8 @@ jobs:
       - name: 测试 GitHub 自动令牌推送工作流
         run: |
           set -euo pipefail
-          echo '# token write permission test' >> .github/workflows/wabi-write-test.yml
-          git add .github/workflows/wabi-write-test.yml
+          echo 'token write permission test' >> wabi-token-test.txt
+          git add wabi-token-test.txt
           git commit -m 'test: verify token can update workflow file'
           git push origin "HEAD:${GITHUB_REF_NAME}"
 
